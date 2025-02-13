@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup and Restore Firestore</title>
+</head>
+<body>
+    <!--  -->
+    <h1>Backup and Restore Firestore</h1>
+    <p>AMBIL DATA UNTUK DIBACKUP</p>
+    <button id="backupButton">Backup Data</button>
+    <br>
+    <p>UPLOAD DATA UNTUK FIREBASE BARU</p>
+    <input type="file" id="fileInput" accept=".json">
+    <button id="uploadButton">Upload Data</button>
+   
+    <pre id="output"></pre>
+
+    <script type="module">
+        // Import Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+        import { getFirestore, collection, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+            //download
+            // Firebase configuration 
+            const firebaseConfig = {
+                        apiKey: "YOUR_API_KEY",
+                        authDomain: "YOUR_AUTH_DOMAIN",
+                        projectId: "YOUR_PROJECT_ID",
+                        storageBucket: "YOUR_STORAGE_BUCKET",
+                        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                        appId: "YOUR_APP_ID"
+                    };
+
+            //upload
+            // Firebase configuration
+            // const firebaseConfig = {
+            //             apiKey: "YOUR_API_KEY",
+            //             authDomain: "YOUR_AUTH_DOMAIN",
+            //             projectId: "YOUR_PROJECT_ID",
+            //             storageBucket: "YOUR_STORAGE_BUCKET",
+            //             messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            //             appId: "YOUR_APP_ID"
+            //         };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // List of collections to backup
+        const collections = [
+            "dataPenjualan", 
+            "dataPenjualanBeta",
+            "dataUser",
+            "dataDll"
+        ]; // Ganti dengan daftar koleksi Anda
+
+        // Function to get data from specified collections
+        async function backupFirestore() {
+            const backupData = {};
+
+            for (const collectionName of collections) {
+                const colRef = collection(db, collectionName);
+                const snapshot = await getDocs(colRef);
+                backupData[collectionName] = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    data: doc.data()
+                }));
+            }
+
+            return backupData;
+        }
+
+        // Function to download data as JSON
+        function downloadJSON(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        // Function to restore data to Firestore
+        async function restoreFirestore(data) {
+            for (const collectionName in data) {
+                const documents = data[collectionName];
+                for (const docItem of documents) {
+                    const docRef = doc(db, collectionName, docItem.id);
+                    await setDoc(docRef, docItem.data);
+                }
+            }
+        }
+
+        // Backup button click event
+        document.getElementById('backupButton').addEventListener('click', async () => {
+            try {
+                const data = await backupFirestore();
+                downloadJSON(data, "firestore_backup.json");
+                console.log('Backup complete', data);
+            } catch (error) {
+                console.error('Error during backup:', error);
+            }
+        });
+
+        // Upload button click event
+        document.getElementById('uploadButton').addEventListener('click', () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async function (event) {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        await restoreFirestore(data);
+                        console.log('Data successfully restored');
+                        document.getElementById('output').textContent = 'Data successfully restored!';
+                    } catch (error) {
+                        console.error('Error during restore:', error);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please select a file to upload.');
+            }
+        });
+    </script>
+</body>
+</html>
